@@ -1,3 +1,5 @@
 httpx
 asyncio
+authlib
 rich
+pyyaml
