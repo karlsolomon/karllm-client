@@ -102,17 +102,31 @@ def get_auth_headers():
     return {"X-Session-Token": SESSION_ID}
 
 
-def get_supported_filetypes():
-    """Query server for supported file extensions."""
-    response = httpx.get(f"{API_URL}/filetypes", headers=get_auth_headers())
+def handle_get_response(command: str):
+    """Send a GET request and print response in markdown block."""
+    url = f"{API_URL}{command}"
+    headers = get_auth_headers()
     try:
-        return response.text.strip().split(",")
-    except:
-        return [".txt"]
+        response = httpx.get(url, headers=headers)
+        if response.status_code == 200:
+            try:
+                parsed = response.json()
+                # If /help returns a markdown table in 'help'
+                if isinstance(parsed, dict):
+                    content = parsed.get("help", json.dumps(parsed, indent=2))
+                    console.print(Markdown(content))
+                else:
+                    console.print(Markdown(str(parsed)))
+            except Exception:
+                console.print(f"[red]✘ Failed to parse response[/red]\n{response.text}")
+        else:
+            console.print(f"[red]✘ {response.status_code}:[/red] {response.text}")
+    except Exception as e:
+        console.print(f"[red]✘ GET request failed: {e}[/red]")
 
 
-async def stream_chat_async(prompt: str, command: str):
-    """Stream chat response from the server as markdown."""
+async def handle_post_stream(prompt: str, command: str):
+    """Send a POST request and stream response from the server as markdown."""
     global last_interaction
     url = f"{API_URL}{command}"
     headers = {"Accept": "text/event-stream", **get_auth_headers()}
@@ -180,9 +194,12 @@ def main():
         if user_input.strip() == "/exit":
             break
         elif user_input.startswith("/"):
-            asyncio.run(stream_chat_async("", user_input))
+            if user_input in ["/help", "/filetypes", "/convo/list"]:
+                handle_get_response(user_input)
+            else:
+                asyncio.run(handle_post_stream("", user_input))
         else:
-            asyncio.run(stream_chat_async(user_input, "/stream"))
+            asyncio.run(handle_post_stream(user_input, "/stream"))
 
 
 if __name__ == "__main__":
