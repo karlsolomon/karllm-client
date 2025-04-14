@@ -19,10 +19,11 @@ API_URL = "http://chat.ezevals.com:34199"
 ALGORITHM = "EdDSA"
 SESSION_ID = None
 last_interaction = time.time()
+client_config = None
 
 
 def load_jwt_token():
-    """Load and sign a JWT using the private key from the user's config."""
+    global client_config
     config_path = (
         Path(os.environ.get("XDG_CONFIG_HOME", "~/.config")).expanduser()
         / "karllm"
@@ -32,10 +33,10 @@ def load_jwt_token():
         raise RuntimeError(f"Missing client config at {config_path}")
 
     with open(config_path, "r") as f:
-        config = yaml.safe_load(f)
+        client_config = yaml.safe_load(f)
 
-    username = config.get("username")
-    private_key_path = config.get("secret")
+    username = client_config.get("username")
+    private_key_path = client_config.get("secret")
 
     if not username or not private_key_path:
         raise RuntimeError("Config must include 'username' and 'secret' fields")
@@ -50,7 +51,7 @@ def load_jwt_token():
 
     payload = {
         "sub": username,
-        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=10)).timestamp()),
+        "exp": int((datetime.now(timezone.utc) + timedelta(hours=10)).timestamp()),
     }
 
     return jwt.encode(header, payload, jwk).decode("utf-8")
@@ -64,7 +65,9 @@ def connect_and_get_session():
     global SESSION_ID
     try:
         response = httpx.post(
-            f"{API_URL}/connect", headers={"Authorization": f"Bearer {JWT_TOKEN}"}
+            f"{API_URL}/connect",
+            headers={"Authorization": f"Bearer {JWT_TOKEN}"},
+            json={"saveInteractions": client_config.get("saveInteractions", False)},
         )
         response.raise_for_status()
         SESSION_ID = response.json()["session_id"]
@@ -75,22 +78,24 @@ def connect_and_get_session():
 
 def keep_alive():
     """Send periodic keep-alive pings to prevent session expiry."""
-    global SESSION_ID
+    global SESSION_ID, last_interaction
     while True:
         time.sleep(30)
-        if SESSION_ID and time.time() - last_interaction > 25:
+        if SESSION_ID and ((time.time() - last_interaction) > (60 * 29)):
             try:
                 httpx.post(
                     f"{API_URL}/keepalive",
                     headers={"X-Session-Token": SESSION_ID},
                     timeout=5,
                 )
+                last_interaction = time.time()
             except Exception as e:
                 console.print(f"[yellow]⚠ Keep-alive failed: {e}[/yellow]")
 
 
 connect_and_get_session()
 threading.Thread(target=keep_alive, daemon=True).start()
+AUTH_HEADERS = lambda: {"X-Session-Token": SESSION_ID}
 
 
 def get_auth_headers():
