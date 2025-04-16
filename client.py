@@ -22,6 +22,37 @@ last_interaction = time.time()
 client_config = None
 
 
+def handle_upload(path, newname=None):
+    file_path = Path(path).expanduser()
+    if not file_path.exists():
+        console.print(f"[red]File not found: {file_path}[/red]")
+        return
+
+    with open(file_path, "rb") as f:
+        files = {"file": (file_path.name, f)}
+        data = {"newfilename": newname} if newname else {}
+        headers = get_auth_headers()
+
+        response = httpx.post(
+            f"{API_URL}/upload", files=files, data=data, headers=headers
+        )
+        if response.status_code == 200:
+            console.print(f"[green]\u2714 {response.json()['message']}[/green]")
+        else:
+            console.print(f"[red]\u2718 Upload failed: {response.text}[/red]")
+
+
+def handle_read(filename):
+    headers = get_auth_headers()
+    response = httpx.post(
+        f"{API_URL}/read", json={"filename": filename}, headers=headers
+    )
+    if response.status_code == 200:
+        console.print(f"[green]\u2714 {response.json()['message']}[/green]")
+    else:
+        console.print(f"[red]\u2718 Read failed: {response.text}[/red]")
+
+
 def load_jwt_token():
     global client_config
     config_path = (
@@ -193,6 +224,11 @@ def main():
         user_input = Prompt.ask("[yellow]You[/yellow]")
         if user_input.strip() == "/exit":
             break
+        elif user_input.startswith("/upload "):
+            parts = user_input.split()
+            handle_upload(parts[1], parts[2] if len(parts) > 2 else None)
+        elif user_input.startswith("/read "):
+            handle_read(user_input.split()[1])
         elif user_input.startswith("/"):
             if user_input in ["/help", "/filetypes", "/convo/list"]:
                 handle_get_response(user_input)
