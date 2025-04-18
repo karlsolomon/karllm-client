@@ -112,7 +112,7 @@ def keep_alive():
     global SESSION_ID, last_interaction
     while True:
         time.sleep(30)
-        if SESSION_ID and ((time.time() - last_interaction) > (60 * 29)):
+        if SESSION_ID and ((time.time() - last_interaction) > (60 * 5)):
             try:
                 httpx.post(
                     f"{API_URL}/keepalive",
@@ -230,7 +230,13 @@ def main():
         elif user_input.startswith("/read "):
             handle_read(user_input.split()[1])
         elif user_input.startswith("/"):
-            if user_input in ["/help", "/filetypes", "/convo/list"]:
+            if user_input in [
+                "/help",
+                "/filetypes",
+                "/convo/list",
+                "/model/get",
+                "/model/list",
+            ]:
                 handle_get_response(user_input)
             else:
                 asyncio.run(handle_post_stream("", user_input))
