@@ -15,7 +15,8 @@ from rich.markdown import Markdown
 from rich.prompt import Prompt
 
 console = Console()
-API_URL = "http://chat.ezevals.com:34199"
+# API_URL = "http://chat.ezevals.com:34199"
+API_URL = "http://10.224.174.3:34199"
 ALGORITHM = "EdDSA"
 SESSION_ID = None
 last_interaction = time.time()
