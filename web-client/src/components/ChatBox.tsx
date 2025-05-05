@@ -1,46 +1,117 @@
-import { useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import { chatWithLLM } from "../api";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import rehypeRaw from "rehype-raw";
+import rehypePrism from "rehype-prism-plus";
+import "katex/dist/katex.min.css";
+import "../chat-theme.css";
 
-export default function ChatBox() {
-  const [messages, setMessages] = useState<any[]>([]);
-  const [input, setInput] = useState("");
-  const [streamedResponse, setStreamedResponse] = useState("");
+interface Message {
+  role: "user" | "assistant";
+  content: string;
+}
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const newMessages = [...messages, { role: "user", content: input }];
-    setMessages(newMessages);
-    setInput("");
-    setStreamedResponse("");
+export interface ChatBoxHandle {
+  handleSend: (input: string) => void;
+  streaming: boolean;
+}
 
-    for await (const chunk of chatWithLLM(newMessages)) {
-      setStreamedResponse(prev => prev + chunk);
+const ChatBox = forwardRef<ChatBoxHandle>((_, ref) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [streaming, setStreaming] = useState(false);
+  const [abortController, setAbortController] = useState<AbortController | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  async function handleSend(input: string) {
+    if (!input.trim()) return;
+    const userMessage: Message = { role: "user", content: input };
+    const placeholderAssistant: Message = { role: "assistant", content: "" };
+    setMessages((prev) => [...prev, userMessage, placeholderAssistant]);
+    setStreaming(true);
+
+    const controller = new AbortController();
+    setAbortController(controller);
+
+    let accumulated = "";
+    try {
+      await chatWithLLM(
+        [...messages, userMessage],
+        undefined,
+        (chunk) => {
+          accumulated += chunk;
+          setMessages((prev) => {
+            const updated = [...prev];
+            updated[updated.length - 1] = {
+              role: "assistant",
+              content: accumulated,
+            };
+            return updated;
+          });
+        },
+        controller.signal
+      );
+    } catch (err) {
+      console.error("Streaming error:", err);
+    } finally {
+      setStreaming(false);
+      setAbortController(null);
+    }
+  }
+
+  useImperativeHandle(ref, () => ({
+    handleSend,
+    streaming,
+  }));
+
+  // Updated to handle <think>/</think> tags
+  const renderMessageContent = (content: string) => {
+    const parts = content.split("<think>");
+    if (parts.length <= 1) {
+      return <ReactMarkdown>{content}</ReactMarkdown>;
     }
 
-    setMessages([...newMessages, { role: "assistant", content: streamedResponse }]);
+    const [before, thoughtsAndResponse] = parts;
+    const [thoughts, response] = thoughtsAndResponse.split("</think>");
+
+    return (
+      <>
+        <ReactMarkdown>{before}</ReactMarkdown>
+        <div className="thoughts">
+          <ReactMarkdown>{thoughts}</ReactMarkdown>
+        </div>
+        <ReactMarkdown>{response}</ReactMarkdown>
+      </>
+    );
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto">
-      <div className="border rounded p-4 mb-4 h-96 overflow-y-scroll">
-        {messages.map((msg, idx) => (
-          <div key={idx} className={`mb-2 ${msg.role === "user" ? "text-right" : "text-left"}`}>
-            <b>{msg.role === "user" ? "You" : "Bot"}:</b> {msg.content}
-          </div>
+    <div className="d-flex flex-column h-100 px-3 pt-3">
+      <div className="flex-grow-1 overflow-auto mb-3 border rounded p-3" ref={containerRef}>
+        {messages.map((msg, i) => (
+          <div key={i} className={`chat-message ${msg.role}`}>
+            <div className={`bubble ${msg.role}`}>
+              {msg.role === "assistant" ? (
+                renderMessageContent(msg.content)
+              ) : (
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              )}
+            </div>
+          </
+          div>
         ))}
-        {streamedResponse && (
-          <div className="text-left text-blue-600 whitespace-pre-wrap">{streamedResponse}</div>
-        )}
+        {streaming && <div className="text-muted text-center">Streaming...</div>}
       </div>
-      <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          className="border rounded p-2 flex-1"
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          placeholder="Ask something..."
-        />
-        <button className="bg-blue-500 text-white px-4 rounded" type="submit">Send</button>
-      </form>
     </div>
   );
-}
+});
+
+export default ChatBox;
