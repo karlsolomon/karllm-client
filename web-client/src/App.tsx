@@ -13,6 +13,18 @@ export interface Model {
 }
 
 function App() {
+  
+  useEffect(() => {
+    ;(async () => {
+      try {
+        await loadJwtToken()
+        await connectAndGetSession()
+      } catch (error) {
+        console.error("Initialization Error:", error)
+      }
+    })()
+  }, []);
+
   // Hard-coded initial set of models
   const initialHcModels: Model[] = [
     { name: "qwen3-ctx:30b", nickname: "thinking-VeryFast (MoE)", context: 68608, maxContext: 131072 },
