@@ -33,23 +33,28 @@ const ChatBox = forwardRef<ChatBoxHandle>((_, ref) => {
 
   async function handleSend(input: string) {
     if (!input.trim()) return;
-    const userMessage: Message = { role: "user", content: input };
-    const placeholderAssistant: Message = { role: "assistant", content: "" };
-    setMessages((prev) => [...prev, userMessage, placeholderAssistant]);
+    setMessages(message_state => [...message_state, {role: "user", content: input}]);
+    setMessages(message_state => [...message_state, {role: "assistant", content: ""}]);
     setStreaming(true);
-
     const controller = new AbortController();
     setAbortController(controller);
 
     try {
       await chatWithLLM(
         input,
-        (chunk) => {
-          setMessages((message_state) => [
-            ...message_state,
-            {role: "assistant", content: chunk},
-
-          ]);
+        (chunk: string) => {
+            setMessages(message_state => {
+                if (message_state.length === 0) return message_state;
+                const last = message_state[message_state.length - 1];
+                if(last.role !== "assistant") {
+                    return [...message_state, {role: "assistant", content: chunk}]
+                }
+                const updated = {
+                    ...last,
+                    content: last.content + chunk
+                };
+                return [...message_state.slice(0, -1), updated];
+            });
         },
         controller.signal
       );
