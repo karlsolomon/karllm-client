@@ -41,21 +41,15 @@ const ChatBox = forwardRef<ChatBoxHandle>((_, ref) => {
     const controller = new AbortController();
     setAbortController(controller);
 
-    let accumulated = "";
     try {
       await chatWithLLM(
-        [...messages, userMessage],
-        undefined,
+        prompt,
         (chunk) => {
-          accumulated += chunk;
-          setMessages((prev) => {
-            const updated = [...prev];
-            updated[updated.length - 1] = {
-              role: "assistant",
-              content: accumulated,
-            };
-            return updated;
-          });
+          setMessages((message_state) => [
+            ...message_state,
+            {role: "assistant", content: chunk},
+
+          ]);
         },
         controller.signal
       );
@@ -63,7 +57,6 @@ const ChatBox = forwardRef<ChatBoxHandle>((_, ref) => {
       console.error("Streaming error:", err);
     } finally {
       setStreaming(false);
-      setAbortController(null);
     }
   }
 

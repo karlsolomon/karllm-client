@@ -2,63 +2,39 @@ import { useEffect, useRef, useState } from "react";
 import ChatBox, { ChatBoxHandle } from "./components/ChatBox";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./chat-theme.css";
-import { fetchModelList, setModel, uploadFileToContext } from "./api";
-
-// Data structure to represent a model
-export interface Model {
-  name: string;
-  nickname: string;
-  context: number;
-  maxContext: number;
-}
+import { fetchModelList, setModel, getModel, uploadFileToContext, loadJwtToken, connectAndGetSession } from "./api";
 
 function App() {
   
-  useEffect(() => {
-    ;(async () => {
-      try {
-        await loadJwtToken()
-        await connectAndGetSession()
-      } catch (error) {
-        console.error("Initialization Error:", error)
-      }
-    })()
-  }, []);
-
-  // Hard-coded initial set of models
-  const initialHcModels: Model[] = [
-    { name: "qwen3-ctx:30b", nickname: "thinking-VeryFast (MoE)", context: 68608, maxContext: 131072 },
-    { name: "qwen3-ctx:32b", nickname: "thinking-Fast (qwen)", context: 22528, maxContext: 131072 },
-    { name: "deepseek-r1-ctx:32b", nickname: "thinking-Fast (deepseek)", context: 47104, maxContext: 131072  },
-    { name: "r1-1776-ctx:70b", nickname: "thinking-Large", context: 2048, maxContext: 131072  },
-    { name: "gemma3-ctx:27b", nickname: "Q&A-Fast", context: 100352, maxContext: 131072 },
-    { name: "cogito-ctx:32b", nickname: "reasoning-Fast", context: 47104, maxContext: 131072 },
-    { name: "cogito-ctx:70b", nickname: "reasoning-Large", context: 2048, maxContext: 131072  },
-    { name: "qwen2.5-coder-ctx:32b", nickname: "code-Fast", context: 47104, maxContext: 131072 },
-    { name: "qwen2.5-coder-large-ctx:32b", nickname: "code-Large", context: 34816, maxContext: 131072 },
-    { name: "qwen2-math-ctx:72b", nickname: "math-Large", context: 1024, maxContext: 131072 },
-  ];
-
-  // State for merged hard-coded + fetched models
-  const [hcModels, setHcModels] = useState<Model[]>(initialHcModels);
+  // useEffect(() => {
+  //   ;(async () => {
+  //     try {
+  //       await loadJwtToken()
+  //       await connectAndGetSession()
+  //     } catch (error) {
+  //       console.error("Initialization Error:", error)
+  //     }
+  //   })()
+  // }, []);
+  //
+  // State for models
+  const [models, setModels] = useState<string[]>([]);
   // Currently selected model name
-  const [selectedModel, setSelectedModel] = useState<string>(initialHcModels[0]?.name || "");
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const [input, setInput] = useState("");
   const chatRef = useRef<ChatBoxHandle>(null);
   const [isUploadComplete, setIsUploadComplete] = useState(true);
   const [isStreamingComplete, setIsStreamingComplete] = useState(true);
 
-  // Fetch model names and merge into hcModels
+  // Fetch model names and merge into models
   useEffect(() => {
     fetchModelList().then((modelList: string[]) => {
-      setHcModels((prev) => {
-        const updated = [...prev];
+      setModels(() => {
+        const models = [];
         modelList.forEach((name) => {
-          if (!updated.some((m) => m.name === name)) {
-            updated.push({ name, nickname: name, context: 2048 });
-          }
+          models.push({ name });
         });
-        return updated;
+        return models;
       });
     });
   }, []);
@@ -173,15 +149,14 @@ function App() {
             LLM Chat Interface
           </h1>
           <div className="d-flex gap-2 flex-wrap">
-            {/* Model selection shows nickname */}
             <select
               className="form-select form-select-sm w-auto bg-dark text-light border-secondary"
               value={selectedModel}
               onChange={handleModelChange}
             >
-              {hcModels.map((m) => (
+              {models.map((m) => (
                 <option key={m.name} value={m.name}>
-                  {m.nickname}
+                  {m.name}
                 </option>
               ))}
             </select>
