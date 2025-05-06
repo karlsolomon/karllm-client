@@ -43,7 +43,7 @@ const ChatBox = forwardRef<ChatBoxHandle>((_, ref) => {
 
     try {
       await chatWithLLM(
-        prompt,
+        input,
         (chunk) => {
           setMessages((message_state) => [
             ...message_state,

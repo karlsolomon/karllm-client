@@ -7,7 +7,8 @@ import { loadJwkFromFS } from './fsKey'
 
 
 
-const BASE_URL = "https://chat.ezevals.com:54269"; // Your backend URL
+// const BASE_URL = "https://chat.ezevals.com:54269"; // Your backend URL
+const BASE_URL = "http://10.224.174.3:34199"; // Your backend URL
 const ALGORITHM = "EdDSA"
 
 let clientConfig: {
@@ -59,7 +60,7 @@ function getAuthHeaders(): Record<string,string> {
 }
 
 export async function clearChat() {
-  const res = await fetch("/clear", {
+  const res = await fetch(`${BASE_URL}/session/clear`, {
     method: "POST",
     headers: {
       'Content-Type': 'application/json',
@@ -95,12 +96,12 @@ export async function chatWithLLM(
   onChunk: (chunk: string) => void,
   signal?: AbortSignal
 ): Promise<void> {
-  const res = await fetch(`/chat/stream`, {
+  const res = await fetch(`${BASE_URL}/chat/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({prompt}),
+    body: JSON.stringify({prompt: prompt}),
     signal,
   });
 
@@ -119,16 +120,30 @@ export async function chatWithLLM(
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
-    const parts = buffer.split("\n\n");
-    buffer = parts.pop()!;
-    for (const part of parts) {
-      for (const line of part.split("\n")) {
-        if (line.startsWith("data:")) {
-          const data = line.replace(/^data:\s*/, "");
-          if (data === "[DONE]") {
-            return;
-          }
+    const events = buffer.split(/\r?\n\r?\n/);
+    buffer = events.pop()!;
+    for (const event of events) {
+      for (const line of event.split(/\r?\n/)) {
+        if (!line.startsWith("data:")) continue;
+        const raw = line.slice("data:".length).trim();
+        if (data === "[DONE]") {
+          return;
         }
+        let msg: any;
+        try {
+          msg = JSON.parse(raw);
+          console.log(msg);
+        } catch (e) {
+          onChunk(raw);
+          continue;
+        }
+        let text = msg.text;
+        if (Array.isArray(text)) {
+          text = text.join("");
+        } else if (typeof text !== "string") {
+          text = String(text);
+        }
+        onChunk(text);
       }
     }
   }

@@ -2,21 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import ChatBox, { ChatBoxHandle } from "./components/ChatBox";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./chat-theme.css";
-import { fetchModelList, setModel, getModel, uploadFileToContext, loadJwtToken, connectAndGetSession } from "./api";
+import { fetchModelList, setModel, getModel, clearChat, uploadFileToContext, loadJwtToken, connectAndGetSession } from "./api";
 
 function App() {
   
-  // useEffect(() => {
-  //   ;(async () => {
-  //     try {
-  //       await loadJwtToken()
-  //       await connectAndGetSession()
-  //     } catch (error) {
-  //       console.error("Initialization Error:", error)
-  //     }
-  //   })()
-  // }, []);
-  //
   // State for models
   const [models, setModels] = useState<string[]>([]);
   // Currently selected model name
@@ -114,12 +103,7 @@ function App() {
 
   const handleClearChat = async () => {
     try {
-      const response = await fetch("/clear", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await clearChat();
       if (response.ok) {
         console.info("Cleared chat history");
       }
