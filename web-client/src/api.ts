@@ -126,7 +126,8 @@ export async function chatWithLLM(
       for (const line of event.split(/\r?\n/)) {
         if (!line.startsWith("data:")) continue;
         const raw = line.slice("data:".length).trim();
-        if (data === "[DONE]") {
+        if (raw === "[DONE]") {
+          await reader.cancel();
           return;
         }
         let msg: any;
