@@ -78,9 +78,8 @@ export async function uploadFileToContext(...files: File[]) {
   const formData = new FormData();
   files.forEach(file => formData.append("files", file));
 
-  const res = await fetch("/upload", {
+  const res = await fetch(`${BASE_URL}/file/upload`, {
     method: "POST",
-    headers: { ...getAuthHeaders() },
     body: formData,
   });
 
@@ -133,7 +132,11 @@ export async function chatWithLLM(
         let msg: any;
         try {
           msg = JSON.parse(raw);
-          console.log(msg);
+          if(msg.text === "[DONE]") {
+            (Array.isArray(msg.text) && msg.text.length === 1 && msg.text[0] === "[DONE]")
+            await reader.cancel();
+            return;
+          }
         } catch (e) {
           onChunk(raw);
           continue;
